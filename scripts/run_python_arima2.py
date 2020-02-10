@@ -1,0 +1,93 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Dec 30 10:45:52 2019
+
+@author: LY
+"""
+from matplotlib import pyplot
+import pandas as pd
+import numpy as np
+from rpy2.robjects import r, pandas2ri
+import rpy2.robjects as robjects
+from pyecharts import Line
+from model.functions_xsyc import fun_python_arima
+
+#df=pd.read_excel("sales.xls",index_col='日期',header=0)
+#df=pd.read_csv("../data/sales.csv",index_col='日期',header=0)
+
+df=pd.read_csv("../data/sales3.csv",header=None)
+#df=df.iloc[:,[0,5]]
+df.columns=['timestamp','销量']
+df.sort_values('timestamp',inplace=True)
+df.reset_index(inplace=True,drop=True)
+#df=df.set_index("timestamp", drop=True)
+
+
+months=15
+columns_pre=df.index[-months:]
+df_pre=pd.DataFrame(np.zeros((months,months)))
+df_pre.columns=columns_pre
+df_pre["add1"]=0
+df_pre['add2']=0
+df_pre["add3"]=0
+
+for i in range(df.shape[0]-months,df.shape[0]):
+    data=df[0:i]
+    try:
+        result_arima=fun_python_arima(data)
+    except Exception as e:
+        print("调用失败",data)
+        result_arima=[0,0,0,0]
+
+    print(i,result_arima)
+    
+    begin_num=(i+months-df.shape[0])
+    try:
+        df_pre.iloc[begin_num,begin_num:begin_num+4]=result_arima
+        #df_pre.iloc[begin_num,begin_num:begin_num+4]=[1,1,1,1]
+    except Exception as e:
+        print('报错')
+    
+    
+df_plot=df_pre.iloc[:,3:-3]
+list_pre1=[]
+list_pre2=[]
+list_pre3=[]
+list_pre4=[]
+for j in range(0,df_plot.shape[1]):
+    list_pre1.append(df_plot.iloc[j,j])
+    list_pre2.append(df_plot.iloc[j+1,j])
+    list_pre3.append(df_plot.iloc[j+2,j])
+    list_pre4.append(df_plot.iloc[j+3,j])
+
+        
+date_all=df.index[df.shape[0]-months+3:]
+sales_real= df['销量'][df.shape[0]-months+3:]
+
+date_pre=df_plot.columns
+sales1=list_pre1
+sales2=list_pre2
+sales3=list_pre3
+sales4=list_pre4
+
+
+#sales_mean=(sales_arima_r+ sales4)/2
+    
+date_all=list(map(str,date_all))
+date_pre=list(map(str,date_pre))
+
+line = Line("空调销售预测")
+line.add("实际销量结果", date_all, sales_real,linestyle="--",line_color='black',line_width=2)
+
+line.add("第一次预测结果", date_pre, sales1,line_color='green')
+line.add("第二次预测结果", date_pre, sales2,line_color='green')
+line.add("第三次预测结果", date_pre, sales3,line_color='green')
+line.add("第四次预测结果", date_pre, sales4,line_color='green')
+#line.add("r语言预测结果",date_pre,sales_arima_r,line_color='red')
+#line.add("r与python第四次平均预测结果",date_pre,sales_mean)
+#line.add("商家B", attr, v2, is_smooth=True,mark_line=["max", "average"])
+line.render('../data/python_arima2.html')
+
+#print("r语言arima均差",np.mean(np.abs(sales_real-sales_arima_r)))
+print("python语言arima均差",np.mean(np.abs(sales_real-sales4)))
+#print("平均均差",np.mean(np.abs(sales_real-sales_mean)))
